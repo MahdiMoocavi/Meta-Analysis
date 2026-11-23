@@ -168,75 +168,118 @@ t_statistics <- t.test(wdf$Number.of.Animate.words.recalled, wdf$Number.of.Inani
 t_statistics
 
 
-####  GROUP analysis I
+# Compute a bias-corrected standardized mean change and its sampling
+# variance for a paired comparison. Pairwise missing observations are removed
+# before the effect size, t-test, and sample size are calculated.
+paired_smcc <- function(x, y) {
+  paired <- data.frame(
+    x = suppressWarnings(as.numeric(x)),
+    y = suppressWarnings(as.numeric(y))
+  )
+  paired <- paired[stats::complete.cases(paired), , drop = FALSE]
+  n <- nrow(paired)
 
-# T-test Loop
-df_smd <- data.frame()
-T_df_A <- data.frame()
+  if (n < 3 || stats::sd(paired$x - paired$y) == 0) {
+    return(data.frame(
+      npp = n, p_value = NA_real_, conf_up = NA_real_,
+      conf_low = NA_real_, stderr = NA_real_, t_statistics = NA_real_,
+      yi = NA_real_, vi = NA_real_, sei = NA_real_, weights = NA_real_
+    ))
+  }
 
-for (i in 1:n_groups){
-  file_name <- paste('./group',i,'.csv',sep = "")
-  data <- read.csv(file_name, header = T)
-  t_value <- t.test(data$Number.of.Animate.words.recalled,
-                    data$Number.of.Inanimate.words.recalled,
-                    mu=0, alt="two.sided", paired=T, conf.level=0.99)
-  N <- nrow(data)
-  
-  # Calculate yi, vi, sei, and weights
-  yi <- t_value$statistic / sqrt(N)
-  sei <- sd(c(data$Number.of.Animate.words.recalled,
-              data$Number.of.Inanimate.words.recalled)) / sqrt(N)
-  vi <- sei^2
-  weights <- 1 / vi
-  
-  df_smd <- data.frame(
-    npp = N,
-    p_value = t_value$p.value,
-    conf_up = t_value$conf.int[2],
-    conf_low = t_value$conf.int[1],
-    stderr = t_value$stderr,
-    t_statistics = t_value$statistic,
+  test <- stats::t.test(paired$x, paired$y, paired = TRUE, conf.level = 0.99)
+  within_correlation <- suppressWarnings(stats::cor(paired$x, paired$y))
+
+  if (!is.finite(within_correlation)) {
+    return(data.frame(
+      npp = n, p_value = test$p.value, conf_up = test$conf.int[2],
+      conf_low = test$conf.int[1], stderr = test$stderr,
+      t_statistics = unname(test$statistic), yi = NA_real_,
+      vi = NA_real_, sei = NA_real_, weights = NA_real_
+    ))
+  }
+
+  effect <- metafor::escalc(
+    measure = "SMCC",
+    m1i = mean(paired$x),
+    m2i = mean(paired$y),
+    sd1i = stats::sd(paired$x),
+    sd2i = stats::sd(paired$y),
+    ri = within_correlation,
+    ni = n,
+    vtype = "LS"
+  )
+
+  yi <- as.numeric(effect$yi[1])
+  vi <- as.numeric(effect$vi[1])
+
+  data.frame(
+    npp = n,
+    p_value = test$p.value,
+    conf_up = test$conf.int[2],
+    conf_low = test$conf.int[1],
+    stderr = test$stderr,
+    t_statistics = unname(test$statistic),
     yi = yi,
     vi = vi,
-    sei = sei,
-    weights = weights
+    sei = sqrt(vi),
+    weights = 1 / vi
   )
-  
-  T_df_A <- rbind(T_df_A, df_smd)
 }
 
-write.csv(T_df_A, "T_table_A.csv", row.names=F)
 
+#### GROUP analysis I: paired animacy-recall effects
 
+T_df_A <- do.call(rbind, lapply(seq_len(n_groups), function(i) {
+  file_name <- paste0("./group", i, ".csv")
+  study_data <- read.csv(file_name, header = TRUE)
 
-#####  META-analysis I
+  effect <- paired_smcc(
+    study_data$Number.of.Animate.words.recalled,
+    study_data$Number.of.Inanimate.words.recalled
+  )
+  cbind(Experimental.Group = i, effect)
+}))
 
-# Random Effects
-REML_model <- rma(yi, vi, method="EE", data=T_df_A)
-summary(REML_model)
+write.csv(T_df_A, "T_table_A.csv", row.names = FALSE)
 
+##### META-analysis I: equal-effects model
 
-# Forest plot
-T_df_A$t_statistics <- round(T_df_A$t_statistics, 2)
+meta_A_data <- subset(T_df_A, is.finite(yi) & is.finite(vi) & vi > 0)
+EE_model_A <- metafor::rma(yi, vi, method = "EE", data = meta_A_data)
+summary(EE_model_A)
+
+meta_A_data$t_statistics <- round(meta_A_data$t_statistics, 2)
 par(mfrow = c(1, 2))
-figure2 <- forest(REML_model, main = "A. Forest Plot of the Animacy Effect Meta-Analysis",
-                  header = "Experiments and Corresponding t-Statistics                                                                                                                Weights",
-                  xlim = c(-1.3, 3.5),
-                  refline = coef(REML_model), cex = .6, psize = 1,       
-                  showweights = T,
-                  addpred = T,
-                  slab = paste0("Study ", 1:65, ": t(", npp-1, ") = ", T_df_A$t_statistics),
-                  order = "obs",
-                  xlab = "Standardized Mean Differences (Cohen's d)")
-figure3 <- funnel(REML_model, main = "B. Funnel Plot of the Animacy Effect Meta-Analysis", header = "Experiment",
-                  refline = coef(REML_model), level = c(90, 95, 99),
-                  shade = c("white", "gray65", "gray25"), lty2 = 1, label = TRUE,
-                  yaxis = "sei", legend = T, refline2 = coef(REML_model))
-
-
-T_df_I$t_statistics <- round(T_df_I$t_statistics, 2)
-par(mfrow = c(1, 2))
-
+figure2 <- forest(
+  EE_model_A,
+  main = "A. Equal-Effects Meta-Analysis of the Animacy Recall Difference",
+  header = "Study, sample size, and paired t statistic",
+  xlim = c(-1.3, 3.5),
+  refline = coef(EE_model_A),
+  cex = 0.6,
+  psize = 1,
+  showweights = TRUE,
+  slab = paste0(
+    "Study ", meta_A_data$Experimental.Group,
+    " (n=", meta_A_data$npp,
+    "; t=", meta_A_data$t_statistics, ")"
+  ),
+  order = "obs",
+  xlab = "Hedges' g (standardized mean change)"
+)
+figure3 <- funnel(
+  EE_model_A,
+  main = "B. Funnel Plot of the Animacy Recall Meta-Analysis",
+  header = "Study",
+  refline = coef(EE_model_A),
+  level = c(90, 95, 99),
+  shade = c("white", "gray65", "gray25"),
+  lty2 = 1,
+  label = TRUE,
+  yaxis = "sei",
+  legend = TRUE
+)
 
 
 #### 2) Interactive Imagery Effect
@@ -248,84 +291,59 @@ t_statistics <- t.test(wdf$Animate..average.interaction.rating.
 t_statistics
 
 
-####  GROUP analysis II
+#### GROUP analysis II: paired interaction-rating effects
 
+T_df_I <- do.call(rbind, lapply(seq_len(n_groups), function(i) {
+  file_name <- paste0("./group", i, ".csv")
+  study_data <- read.csv(file_name, header = TRUE)
 
-# T-test Loop
-df_smd <- data.frame()
-T_df_I <- data.frame()
-
-for (i in 1:n_groups){
-  file_name <- paste('./group',i,'.csv',sep = "")
-  data <- read.csv(file_name, header = T)
-  t_value <- t.test(data$Animate..average.interaction.rating.,
-                    data$Inanimate..average.interaction.rating.,
-                    mu=0, alt="two.sided", paired=T, conf.level=0.99)
-  N <- nrow(data)
-  
-  yi <- t_value$statistic / sqrt(N)
-  sei <- sd(c(data$Number.of.Animate.words.recalled,
-              data$Number.of.Inanimate.words.recalled)) / sqrt(N)
-  
-  # check if sei is zero or infinite
-  if (sei == 0 || is.infinite(sei)) {
-    vi <- NA
-    weights <- NA
-  } else {
-    vi <- sei^2
-    weights <- 1 / vi
-  }
-  
-  df_smd <- data.frame(
-    npp = N,
-    p_value = t_value$p.value,
-    conf_up = t_value$conf.int[2],
-    conf_low = t_value$conf.int[1],
-    stderr = t_value$stderr,
-    t_statistics = t_value$statistic,
-    yi = yi,
-    vi = vi,
-    sei = sei,
-    weights = weights
+  effect <- paired_smcc(
+    study_data$Animate..average.interaction.rating.,
+    study_data$Inanimate..average.interaction.rating.
   )
-  
-  T_df_I <- rbind(T_df_I, df_smd)
-}
+  cbind(Experimental.Group = i, effect)
+}))
 
-write.csv(T_df_I, "T_table_I.csv", row.names=F)
+write.csv(T_df_I, "T_table_I.csv", row.names = FALSE)
 
+#### META-analysis II: random-effects model
 
+meta_I_data <- subset(T_df_I, is.finite(yi) & is.finite(vi) & vi > 0)
+RE_model_I <- metafor::rma(yi, vi, method = "REML", data = meta_I_data)
+summary(RE_model_I)
 
-
-####  META-analysis II
-
-# Random Effects
-REML_model <- rma(yi, vi, method="REML", data=T_df_I)
-summary(REML_model)
-
-
-# Forest plot
-T_df_I$t_statistics <- round(T_df_I$t_statistics, 2)
+meta_I_data$t_statistics <- round(meta_I_data$t_statistics, 2)
 par(mfrow = c(1, 2))
-figure2 <- forest(REML_model, main = "A. Forest Plot of the Ease of Interaction Meta-Analysis",
-                  header="Experiments and Corresponding t-Statistics                                                                                                                Weigts",
-                  xlim = c(-3, 2),
-                  refline = coef(REML_model), cex=.6, psize=1,       
-                  showweights = T,
-                  addpred = T,
-                  slab=paste0("Study ", 1:65,": t(", npp-1, ") = ", T_df_I$t_statistics),
-                  order="obs",
-                  xlab = "Standardized Mean Differences (Cohen's d)")
-
-### Funnel plot
-figure3 <- funnel(REML_model, main = "B. Funnel Plot of the Ease of Interaction Meta-Analysis", header="Experiment",
-                  refline = coef(REML_model), level=c(90, 95, 99),
-                  shade=c("white", "gray65", "gray25"),lty2 = 1, label = T,
-                  yaxis="sei", legend = T, refline2 = coef(REML_model))
-
-
-
-
+figure2 <- forest(
+  RE_model_I,
+  main = "A. Random-Effects Meta-Analysis of Interaction Ratings",
+  header = "Study, sample size, and paired t statistic",
+  xlim = c(-3, 2),
+  refline = coef(RE_model_I),
+  cex = 0.6,
+  psize = 1,
+  showweights = TRUE,
+  addpred = TRUE,
+  slab = paste0(
+    "Study ", meta_I_data$Experimental.Group,
+    " (n=", meta_I_data$npp,
+    "; t=", meta_I_data$t_statistics, ")"
+  ),
+  order = "obs",
+  xlab = "Hedges' g (standardized mean change)"
+)
+figure3 <- funnel(
+  RE_model_I,
+  main = "B. Funnel Plot of the Interaction-Rating Meta-Analysis",
+  header = "Study",
+  refline = coef(RE_model_I),
+  level = c(90, 95, 99),
+  shade = c("white", "gray65", "gray25"),
+  lty2 = 1,
+  label = TRUE,
+  yaxis = "sei",
+  legend = TRUE
+)
 
 
 #### 3) Correlation (Ease of Interaction and Remembering)
@@ -355,75 +373,95 @@ cor.test(average_ratings, recall_proportions)
 
 
 
-correlation_results <- list()
-
-# Iterate through each study
-for (group in unique(rdf$Experimental.Group)) {
+correlation_results <- lapply(unique(rdf$Experimental.Group), function(group) {
   group_data <- subset(rdf, Experimental.Group == group)
-  
-  # Calculate average ratings for variables I1 to I24
-  average_ratings <- colMeans(group_data[, grep("^I\\d+$", names(group_data))])
-  
-  # Calculate proportions 
-  recall_proportions <- colMeans(group_data[, grep("^W\\d+\\..+", names(group_data))])
-  
-  # Calculate correlation 
-  correlation <- cor(average_ratings, recall_proportions)
-  p_value <- cor.test(average_ratings, recall_proportions)$p.value
-  yi <- correlation
-  sei <- sqrt((1 - yi^2) / (length(group_data$ParticipantID)-2))
-  weights <- yi / sei
-  
-  correlation_results[[as.character(group)]] <- c(correlation, p_value, yi, vi, sei, weights)
-}
 
-# Combine correlation results into a data frame
-C_table <- data.frame(
-  Experimental.Group = names(correlation_results),
-  Correlation = sapply(correlation_results, "[[", 1),
-  P_value = sapply(correlation_results, "[[", 2),
-  yi = sapply(correlation_results, "[[", 3),
-  vi = sapply(correlation_results, "[[", 4),
-  sei = sapply(correlation_results, "[[", 5),
-  weights = sapply(correlation_results, "[[", 6),
-  stringsAsFactors = FALSE
-)
+  # Each group contributes one item-level correlation across the 24 stimuli.
+  item_ratings <- colMeans(group_data[, grep("^I\\d+$", names(group_data))])
+  item_recall <- colMeans(group_data[, grep("^W\\d+\\..+", names(group_data))])
 
+  complete_items <- stats::complete.cases(item_ratings, item_recall)
+  item_ratings <- item_ratings[complete_items]
+  item_recall <- item_recall[complete_items]
+
+  if (length(item_ratings) < 4 ||
+      stats::sd(item_ratings) == 0 ||
+      stats::sd(item_recall) == 0) {
+    return(data.frame(
+      Experimental.Group = group,
+      Participants = nrow(group_data),
+      Items = length(item_ratings),
+      Correlation = NA_real_,
+      P_value = NA_real_,
+      yi = NA_real_,
+      vi = NA_real_,
+      sei = NA_real_
+    ))
+  }
+
+  correlation_test <- stats::cor.test(item_ratings, item_recall)
+  correlation <- unname(correlation_test$estimate)
+
+  # Fisher's r-to-z is the standard scale for pooling correlations.
+  effect <- metafor::escalc(
+    measure = "ZCOR",
+    ri = correlation,
+    ni = length(item_ratings)
+  )
+
+  data.frame(
+    Experimental.Group = group,
+    Participants = nrow(group_data),
+    Items = length(item_ratings),
+    Correlation = correlation,
+    P_value = correlation_test$p.value,
+    yi = as.numeric(effect$yi[1]),
+    vi = as.numeric(effect$vi[1]),
+    sei = sqrt(as.numeric(effect$vi[1]))
+  )
+})
+
+C_table <- do.call(rbind, correlation_results)
 write.csv(C_table, "C_table.csv", row.names = FALSE)
 
+#### META-analysis III: random-effects model of Fisher-z correlations
 
+meta_C_data <- subset(C_table, is.finite(yi) & is.finite(vi) & vi > 0)
+RE_model_C <- metafor::rma(yi, vi, method = "REML", data = meta_C_data)
+summary(RE_model_C)
 
-
-####  META-analysis III
-
-### Effect size data frame
-C_table =read.csv('C_table.csv')
-
-# Random Effects
-REML_model <- rma(yi, sei, method="REML", data=C_table)
-summary(REML_model)
-
-
-# Forest plot
-C_table$Correlation <- round(C_table$Correlation, 2)
+meta_C_data$Correlation_label <- round(meta_C_data$Correlation, 2)
 par(mfrow = c(1, 2))
-figure2 <- forest(REML_model, main = "A. Forest Plot of the Correlation Effect Meta-Analysis",
-                  header="Experiments and Corresponding Correlation Coeeficients                                                                                      Weigts",
-                  xlim = c(-2.5, 2.8),
-                  refline = coef(REML_model), cex=.6, psize=1,       
-                  showweights = T,
-                  addpred = T,
-                  slab=paste0("Study ", C_table$Experimental.Group, ": r(22) = ", C_table$Correlation),
-                  order="obs",
-                  xlab = "Correlation Coeeficients (Pearson's R)")
-
-### Funnel plot
-figure3 <- funnel(REML_model, main = "B. Funnel Plot of the Correlation Effect Meta-Analysis", header="Experiment",
-                  refline = coef(REML_model), level=c(90, 95, 99),
-                  shade=c("white", "gray65", "gray25"),lty2 = 1, label = T,
-                  yaxis="sei", legend = T, refline2 = coef(REML_model))
-
-
+figure2 <- forest(
+  RE_model_C,
+  main = "A. Meta-Analysis of Item-Level Interaction–Recall Correlations",
+  header = "Study (number of items; raw correlation)",
+  xlim = c(-2.5, 2.8),
+  refline = coef(RE_model_C),
+  cex = 0.6,
+  psize = 1,
+  showweights = TRUE,
+  addpred = TRUE,
+  slab = paste0(
+    "Study ", meta_C_data$Experimental.Group,
+    " (items=", meta_C_data$Items,
+    "; r=", meta_C_data$Correlation_label, ")"
+  ),
+  order = "obs",
+  xlab = "Fisher's z-transformed correlation"
+)
+figure3 <- funnel(
+  RE_model_C,
+  main = "B. Funnel Plot of the Item-Level Correlation Meta-Analysis",
+  header = "Study",
+  refline = coef(RE_model_C),
+  level = c(90, 95, 99),
+  shade = c("white", "gray65", "gray25"),
+  lty2 = 1,
+  label = TRUE,
+  yaxis = "sei",
+  legend = TRUE
+)
 
 
 #### 4) Language
