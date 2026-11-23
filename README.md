@@ -33,6 +33,22 @@ flowchart TD
 - Apply Fisher's r-to-z transformation (`ZCOR`) before pooling correlations.
 - Produce forest plots, funnel plots, and descriptive visualisations.
 
+## Selected figures
+
+These are the original PNGs uploaded for the project; they are embedded unchanged.
+
+**Figure 1 — distribution of animate and inanimate stimuli across studies**
+
+The two panels show the study-level distributions of average word-recall frequency and average ease-of-interaction ratings.
+
+![Figure 1: distributions of animate and inanimate stimulus recall frequency and interaction ratings](103701.png)
+
+**Figures 5 and 6 — meta-analytic effects and associations**
+
+Figure 5 presents forest- and funnel-plot displays from the meta-analysis. Figure 6 presents the association-effect plots across the 65 studies.
+
+![Figures 5 and 6: forest and funnel plots, followed by association-effect plots across studies](103647.png)
+
 ## Implementation
 
 - **Language:** R
@@ -49,13 +65,21 @@ install.packages(c(
 
 ## Input data
 
-The script expects 65 CSV files in the working directory, named `group1.csv` through `group65.csv`. The files must follow the original study's variable schema. Participant-level source data are not included.
+The script expects 65 CSV files named `group1.csv` through `group65.csv`. The files must follow the original study's variable schema. Participant-level source data are not included.
 
 ## Interpretation and limitations
 
 Paired comparisons use complete pairs within each group. The item-level correlation analysis is based on 24 stimulus items, not the participant count. The original data are required to reproduce numerical results.
 
-The outlier rules, dependence structure of item-level observations, and sampling-variance assumptions should be reviewed before treating pooled estimates as definitive. The README describes the implemented workflow; it does not substitute for a full methodological audit of the original analysis.
+The outlier rules, dependence structure of item-level observations, and sampling-variance assumptions should be reviewed before treating pooled estimates as definitive. The figures are presented as supplied and should be interpreted together with the analysis code and the original study design. The README describes the implemented workflow; it does not substitute for a full methodological audit of the original analysis.
+
+## Reproducibility
+
+1. Place the 65 input CSV files beside the R script.
+2. Open the project directory in R/RStudio.
+3. Install the packages listed above and run `animacy_memory_meta_analysis.R`.
+
+The original participant-level data are not distributed in this repository, so the full analysis cannot be reproduced from the repository alone.
 
 ## Related work
 
