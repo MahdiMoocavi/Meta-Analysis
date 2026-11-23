@@ -1,4 +1,4 @@
-# Meta-Analysis of Animacy, Interaction Ratings, and Memory
+# Animacy, Interactive Imagery, and Memory: Meta-Analysis
 
 An R research-analysis script combining 65 replication groups from English- and Dutch-language versions of a memory experiment. The analyses examine animacy-related recall, interaction ratings, and the association between item-level interaction ratings and recall.
 
@@ -38,7 +38,7 @@ install.packages(c(
 
 ## Run
 
-Set the working directory to the folder containing the 65 group files, install the dependencies, and execute MetaAnalysis_2023_04.R.
+Set the working directory to the folder containing the 65 group files, install the dependencies, and execute animacy_memory_meta_analysis.R.
 
 ## Outputs
 
