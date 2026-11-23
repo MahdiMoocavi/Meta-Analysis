@@ -363,10 +363,10 @@ rdf = rdf[complete.cases(rdf), ]
 
 
 # Calculate average ratings for variables I1 to I24
-average_ratings <- colMeans(rdf[, grep("^I\\d+$", names(rdf))])
+average_ratings <- colMeans(rdf[, grep("^I[0-9]+$", names(rdf))])
 
 # Calculate proportions of participants recalling each word stimulus
-recall_proportions <- colMeans(rdf[, grep("^W\\d+\\..+", names(rdf))])
+recall_proportions <- colMeans(rdf[, grep("^W[0-9]+[.].+", names(rdf))])
 
 # Perform correlation test
 cor.test(average_ratings, recall_proportions)
@@ -377,8 +377,8 @@ correlation_results <- lapply(unique(rdf$Experimental.Group), function(group) {
   group_data <- subset(rdf, Experimental.Group == group)
 
   # Each group contributes one item-level correlation across the 24 stimuli.
-  item_ratings <- colMeans(group_data[, grep("^I\\d+$", names(group_data))])
-  item_recall <- colMeans(group_data[, grep("^W\\d+\\..+", names(group_data))])
+  item_ratings <- colMeans(group_data[, grep("^I[0-9]+$", names(group_data))])
+  item_recall <- colMeans(group_data[, grep("^W[0-9]+[.].+", names(group_data))])
 
   complete_items <- stats::complete.cases(item_ratings, item_recall)
   item_ratings <- item_ratings[complete_items]
@@ -485,7 +485,7 @@ t_lang2
 
 
 # Standardize the values of I1 to I24 over participants
-standardized_I <- lapply(wdf[, grep("^I\\d+$", names(wdf))], function(x) scale(x, center = TRUE, scale = TRUE))
+standardized_I <- lapply(wdf[, grep("^I[0-9]+$", names(wdf))], function(x) scale(x, center = TRUE, scale = TRUE))
 
 # Scale the standardized values of I1 to I24 to a range of 0 to 1
 scaled_I <- lapply(standardized_I, function(x) (x - min(x)) / (max(x) - min(x)))
@@ -495,8 +495,8 @@ average_ratingsA <- colMeans(do.call(cbind, scaled_I[1:12]))
 average_ratingsB <- colMeans(do.call(cbind, scaled_I[13:24]))
 
 # Calculate proportions of participants recalling each word stimulus for W1 to W12
-recall_proportionsA <- colMeans(wdf[, grep("^W\\d+\\..+", names(wdf))[1:12]])
-recall_proportionsB <- colMeans(wdf[, grep("^W\\d+\\..+", names(wdf))[13:24]])
+recall_proportionsA <- colMeans(wdf[, grep("^W[0-9]+[.].+", names(wdf))[1:12]])
+recall_proportionsB <- colMeans(wdf[, grep("^W[0-9]+[.].+", names(wdf))[13:24]])
 
 # Modelling Data Frame
 mdf <- data.frame(W = paste0("w", 1:12),
@@ -557,8 +557,8 @@ for (i in 1:n_groups) {
   group_data <- subset(wdf, Experimental.Group == i)
   
   # Calculate average ratings for scaled variables I1 to I12 and I13 to I24
-  average_ratingsA <- colMeans(group_data[, grep("^I\\d+$", names(group_data))[1:12]])
-  average_ratingsB <- colMeans(group_data[, grep("^I\\d+$", names(group_data))[13:24]])
+  average_ratingsA <- colMeans(group_data[, grep("^I[0-9]+$", names(group_data))[1:12]])
+  average_ratingsB <- colMeans(group_data[, grep("^I[0-9]+$", names(group_data))[13:24]])
   
   # Standardize the average_ratingsA within the current Experimental.Group
   standardized_average_ratingsA <- scale(average_ratingsA)
@@ -577,8 +577,8 @@ for (i in 1:n_groups) {
   scaled_average_ratingsB <- (standardized_average_ratingsB - min_val_B) / (max_val_B - min_val_B)
   
   # Calculate proportions of participants recalling each word stimulus for W1 to W12
-  recall_proportionsA <- colMeans(group_data[, grep("^W\\d+\\..+", names(group_data))[1:12]])
-  recall_proportionsB <- colMeans(group_data[, grep("^W\\d+\\..+", names(group_data))[13:24]])
+  recall_proportionsA <- colMeans(group_data[, grep("^W[0-9]+[.].+", names(group_data))[1:12]])
+  recall_proportionsB <- colMeans(group_data[, grep("^W[0-9]+[.].+", names(group_data))[13:24]])
   
   # Create a temporary dataframe for the current Experimental.Group
   temp_df <- data.frame(Experimental.Group = i,
