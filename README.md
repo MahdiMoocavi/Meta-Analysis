@@ -1,32 +1,43 @@
 # Animacy, Interactive Imagery, and Memory: Meta-Analysis
 
-An R research-analysis script combining 65 replication groups from English- and Dutch-language versions of a memory experiment. The analyses examine animacy-related recall, interaction ratings, and the association between item-level interaction ratings and recall.
+An R analysis of 65 replication groups from English- and Dutch-language versions of a memory experiment. The project examines animacy-related recall, interactive-imagery ratings, and the association between item-level interaction ratings and recall.
 
 ## Research questions
 
-1. **Animacy effect:** Do participants recall different numbers of animate and inanimate words?
-2. **Interaction ratings:** Do animate and inanimate items differ in average interaction ratings?
-3. **Interaction–recall association:** Are item-level interaction ratings associated with recall proportions?
-4. **Language comparison:** Do paired recall patterns differ across the two language groups?
+1. Do participants recall different numbers of animate and inanimate words?
+2. Do animate and inanimate items differ in their interaction ratings?
+3. Are item-level interaction ratings associated with recall proportions?
+4. Do paired recall patterns differ across the two language groups?
 
-## Workflow
+## Analysis workflow
 
-- Combine group-level CSV files and harmonize variables used in the analyses.
+```mermaid
+flowchart TD
+    A[65 group-level datasets] --> B[Harmonise variables]
+    B --> C[Apply study-defined screening]
+    C --> D[Descriptive and assumption checks]
+    D --> E[Paired effect-size estimation]
+    D --> F[Item-level correlation estimation]
+    E --> G[Meta-analytic models]
+    F --> G
+    G --> H[Forest, funnel and descriptive plots]
+```
+
+## Methods
+
+- Combine group-level CSV files and harmonise analysis variables.
 - Apply the study's predefined outlier-screening rules.
-- Inspect descriptive statistics and distributional assumptions.
 - Conduct paired comparisons for recall and interaction ratings.
-- Calculate study-level paired standardized mean-change effects and sampling variances using metafor's SMCC measure.
-- Fit an equal-effects model for the animacy-recall comparison and random-effects models for interaction ratings and item-level correlations.
-- Transform item-level correlations using Fisher's r-to-z (ZCOR) before pooling.
-- Produce forest plots, funnel plots, and descriptive visualizations.
+- Calculate paired standardized mean-change effects using `metafor`'s `SMCC` measure.
+- Fit an equal-effects model for the animacy–recall comparison and random-effects models for interaction ratings and item-level correlations.
+- Apply Fisher's r-to-z transformation (`ZCOR`) before pooling correlations.
+- Produce forest plots, funnel plots, and descriptive visualisations.
 
-## Input data
+## Implementation
 
-The script expects 65 CSV files in the working directory, named group1.csv through group65.csv. Files must follow the variable schema used in the original study, including participant demographics, animate/inanimate interaction ratings, recall measures, and item-level responses. The original participant-level data are not included.
-
-## Requirements
-
-R and the following packages:
+- **Language:** R
+- **Main script:** `animacy_memory_meta_analysis.R`
+- **Core meta-analysis package:** `metafor`
 
 ```r
 install.packages(c(
@@ -36,14 +47,16 @@ install.packages(c(
 ))
 ```
 
-## Run
+## Input data
 
-Set the working directory to the folder containing the 65 group files, install the dependencies, and execute animacy_memory_meta_analysis.R.
-
-## Outputs
-
-The script writes study-level tables (T_table_A.csv, T_table_I.csv, and C_table.csv) and generates forest/funnel plots and descriptive visualizations in the active graphics device.
+The script expects 65 CSV files in the working directory, named `group1.csv` through `group65.csv`. The files must follow the original study's variable schema. Participant-level source data are not included.
 
 ## Interpretation and limitations
 
-The paired comparisons use complete pairs within each group. Standardized paired effects are calculated with the SMCC measure and large-sample sampling-variance approximation; correlation effects are Fisher-z transformed before random-effects pooling. The item-level correlation analysis is based on the 24 stimulus items, not the participant count. The original data are required to reproduce numerical results. Review the study's outlier rules and the dependence structure of item-level observations before treating pooled estimates as definitive.
+Paired comparisons use complete pairs within each group. The item-level correlation analysis is based on 24 stimulus items, not the participant count. The original data are required to reproduce numerical results.
+
+The outlier rules, dependence structure of item-level observations, and sampling-variance assumptions should be reviewed before treating pooled estimates as definitive. The README describes the implemented workflow; it does not substitute for a full methodological audit of the original analysis.
+
+## Related work
+
+The [Replication Processing Pipeline](https://github.com/MahdiMoocavi/Replication-Processing-Pipeline) contains preprocessing code for a related animacy replication dataset.
